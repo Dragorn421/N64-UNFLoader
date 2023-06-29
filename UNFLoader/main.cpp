@@ -102,7 +102,7 @@ int main(int argc, char* argv[])
     program_loop();
 
     // End the program
-    terminate(NULL);
+    terminate_with_code(EXIT_SUCCESS, NULL);
     return 0;
 }
 
@@ -171,7 +171,7 @@ static void parse_args_priority(std::list<char*>* args)
             show_title();
             show_help();
             if (term_isusingcurses())
-                terminate(NULL);
+                terminate_with_code(EXIT_SUCCESS, NULL);
             else
                 pauseprogram();
         }
@@ -276,7 +276,7 @@ static void parse_args(std::list<char*>* args)
                     local_timeout = atoi(*it);
                     if (local_timeout < 0)
                         terminate("Timeout must be larger than zero.");
-                    log_simple("Timeout set to %d seconds.\n", *it);
+                    log_simple("Timeout set to %d seconds.\n", local_timeout);
                 }
                 else
                     terminate("Missing parameter(s) for command '%s'.", command);

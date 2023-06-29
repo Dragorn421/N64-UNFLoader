@@ -1,3 +1,17 @@
+## pyUNFLoader
+
+Python bindings for UNFLoader.
+
+To build the shared object on Linux:
+- `make clean`
+- `make UNFLoader.so`
+
+The python bindings are in `pyUNFLoader.py`.
+Refer to `device.cpp` for documentation on the device_ methods.
+There are also helper_ methods implemented in pure python for making some operations easier.
+
+There is an example usage in `test_pyUNFLoader.py`.
+
 # UNFLoader Program
 
 This folder holds the source code for the UNFLoader program itself. This readme contains information on how to use, and how to build UNFLoader for Windows, macOS, and Linux operating systems.

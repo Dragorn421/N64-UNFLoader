@@ -24,10 +24,6 @@
 #define HEADER_SIZE 16
 #define PATH_SIZE 512
 
-// Max supported protocol versions
-#define USBPROTOCOL_VERSION PROTOCOL_VERSION2
-#define HEARTBEAT_VERSION   1
-
 
 /*********************************
             Structures
@@ -69,7 +65,7 @@ static FILE* local_debugoutfile = NULL;
 static char* local_binaryoutfolderpath = NULL;
 
 // Other
-static int debug_headerdata[HEADER_SIZE];
+static int debug_headerdata[HEADER_SIZE / sizeof(int)];
 static std::queue<SendData*> local_mesgqueue;
 
 
@@ -147,7 +143,7 @@ void debug_main()
             outbuff = NULL;
         }
     }
-    while (dataheader > 0);
+    while (dataheader != 0);
 }
 
 
@@ -218,6 +214,7 @@ static void debug_handle_header(uint32_t size, byte* buffer)
         size = HEADER_SIZE;
 
     // Read bytes until we finished
+    // TODO what if size % 4 != 0 then OOB read
     for (uint32_t i=0; i<size; i+=4)
         debug_headerdata[i/4] = swap_endian(buffer[i + 3] << 24 | buffer[i + 2] << 16 | buffer[i + 1] << 8 | buffer[i]);
 }
@@ -233,7 +230,7 @@ static void debug_handle_header(uint32_t size, byte* buffer)
 static void debug_handle_screenshot(uint32_t size, byte* buffer)
 {
     byte*    image = NULL;
-    uint32_t written = 0;
+    size_t   written = 0;
     uint32_t w = debug_headerdata[2];
     uint32_t h = debug_headerdata[3];
     char*    filename = gen_filename("screenshot", "png");
@@ -252,11 +249,11 @@ static void debug_handle_screenshot(uint32_t size, byte* buffer)
     // Generate the image
     for (uint32_t i=0; i<size; i+=4)
     {
-        int texel = swap_endian(((buffer[i+3]<<24)&0xFF000000) | ((buffer[i+2]<<16)&0xFF0000) | ((buffer[i+1]<<8)&0xFF00) | (buffer[i]&0xFF));
-        if (debug_headerdata[1] == 2) 
+        uint32_t texel = swap_endian(((buffer[i+3]<<24)&0xFF000000) | ((buffer[i+2]<<16)&0xFF0000) | ((buffer[i+1]<<8)&0xFF00) | (buffer[i]&0xFF));
+        if (debug_headerdata[1] == 2) // TODO according to https://github.com/buu342/N64-UNFLoader/wiki/1)-How-UNFLoader-works#datatype_header this should be last in the header, not second
         {
-            short pixel1 = (texel&0xFFFF0000)>>16;
-            short pixel2 = (texel&0x0000FFFF);
+            uint16_t pixel1 = (texel&0xFFFF0000)>>16;
+            uint16_t pixel2 = (texel&0x0000FFFF);
             image[written++] = 0x08*((pixel1>>11) & 0x001F); // R1
             image[written++] = 0x08*((pixel1>>6) & 0x001F);  // G1
             image[written++] = 0x08*((pixel1>>1) & 0x001F);  // B1
@@ -306,7 +303,7 @@ void debug_handle_heartbeat(uint32_t size, byte* buffer)
     device_setprotocol((ProtocolVer)((header&0xFFFF0000)>>16));
 
     // Ensure we support this protocol version
-    if (device_getprotocol() > USBPROTOCOL_VERSION)
+    if (device_getprotocol() > USBPROTOCOL_LATEST)
         terminate("USB protocol %d unsupported. Your UNFLoader is probably out of date.", device_getprotocol());
 
     // Handle the heartbeat by reading more stuff based on the version

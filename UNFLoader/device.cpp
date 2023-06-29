@@ -9,6 +9,7 @@ Passes flashcart communication to more specific functions
 #include "device_everdrive.h"
 #include "device_sc64.h"
 #include <stdio.h>
+#include <assert.h>
 #include <string.h>
 #include <sys/stat.h>
 #ifndef LINUX
@@ -226,6 +227,7 @@ static void device_set_sc64(CartDevice* cart)
 
 DeviceError device_open()
 {
+    assert(funcPointer_open != NULL);
     return funcPointer_open(&local_cart);
 }
 
@@ -251,6 +253,7 @@ bool device_isopen()
 
 uint32_t device_getmaxromsize()
 {
+    assert(funcPointer_maxromsize != NULL);
     return funcPointer_maxromsize();
 }
 
@@ -264,6 +267,7 @@ uint32_t device_getmaxromsize()
 
 uint32_t device_rompadding(uint32_t romsize)
 {
+    assert(funcPointer_rompadding != NULL);
     return funcPointer_rompadding(romsize);
 }
 
@@ -273,29 +277,44 @@ uint32_t device_rompadding(uint32_t romsize)
     Checks whether the flashcart requires
     that the CIC be set explicitly, and sets
     it if so.
-    @param Whether the CIC was changed.
+    @return Whether the CIC was changed.
 ==============================*/
 
 bool device_explicitcic()
 {
+    assert(local_rompath != NULL);
+
     CICType oldcic = local_cart.cictype;
     FILE* fp = fopen(local_rompath, "rb");
     byte* bootcode = (byte*) malloc(4032);
+    size_t nread;
 
     // Check fopen/malloc worked
     if (fp == NULL || bootcode == NULL)
+    {
+        if (fp != NULL)
+            fclose(fp);
+        if (bootcode != NULL)
+            free(bootcode);
         return false;
+    }
 
     // Read the bootcode
     fseek(fp, 0x40, SEEK_SET);
-    if (fread(bootcode, 1, 4032, fp) != 4032)
+    nread = fread(bootcode, 1, 4032, fp);
+
+    fclose(fp);
+
+    if (nread != 4032)
+    {
+        free(bootcode);
         return false;
-    fseek(fp, 0, SEEK_SET);
+    }
 
     // Check the CIC
+    assert(funcPointer_explicitcic != NULL);
     funcPointer_explicitcic(bootcode);
     free(bootcode);
-    fclose(fp);
     return oldcic != local_cart.cictype;
 }
 
@@ -318,7 +337,7 @@ DeviceError device_sendrom(FILE* rom, uint32_t filesize)
     local_uploadprogress = 0.0f;
 
     // Pad the ROM if necessary
-    filesize = funcPointer_rompadding(filesize);
+    filesize = device_rompadding(filesize);
 
     // Check we managed to malloc
     rom_buffer = (byte*) malloc(sizeof(byte)*filesize);
@@ -341,6 +360,7 @@ DeviceError device_sendrom(FILE* rom, uint32_t filesize)
             SWAP(rom_buffer[i], rom_buffer[i+1]);
 
     // Upload the ROM
+    assert(funcPointer_sendrom != NULL);
     err = funcPointer_sendrom(&local_cart, rom_buffer, filesize);
     free(rom_buffer);
     if (err != DEVICEERR_OK)
@@ -357,6 +377,7 @@ DeviceError device_sendrom(FILE* rom, uint32_t filesize)
 
 DeviceError device_testdebug()
 {
+    assert(funcPointer_testdebug != NULL);
     return funcPointer_testdebug(&local_cart);
 }
 
@@ -372,6 +393,7 @@ DeviceError device_testdebug()
 
 DeviceError device_senddata(USBDataType datatype, byte* data, uint32_t size)
 {
+    assert(funcPointer_senddata != NULL);
     return funcPointer_senddata(&local_cart, datatype, data, size);
 }
 
@@ -389,6 +411,7 @@ DeviceError device_senddata(USBDataType datatype, byte* data, uint32_t size)
 
 DeviceError device_receivedata(uint32_t* dataheader, byte** buff)
 {
+    assert(funcPointer_receivedata != NULL);
     return funcPointer_receivedata(&local_cart, dataheader, buff);
 }
 
@@ -408,6 +431,7 @@ DeviceError device_close()
         return DEVICEERR_OK;
 
     // Close the device
+    assert(funcPointer_close != NULL);
     err = funcPointer_close(&local_cart);
     local_cart.structure = NULL;
     return err;

@@ -2,6 +2,7 @@
 #define __HELPER_HEADER
 
     #include "device.h"
+    #include <stdlib.h>
     #include <stdint.h>
     #include <time.h>
 
@@ -12,6 +13,7 @@
 
     // Useful
     void     terminate(const char* reason, ...);
+    void     terminate_with_code(int exit_code, const char* reason, ...);
     void     pauseprogram();
     void     progressthread(const char* msg);
     void     progressbar_draw(const char* text, short color, float percent);

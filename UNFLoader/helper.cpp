@@ -40,19 +40,39 @@ const char* save_strings[] = {"EEPROM 4Kbit", "EEPROM 16Kbit", "SRAM 256Kbit", "
 const int   save_strcount = sizeof(save_strings)/sizeof(save_strings[0]);
 
 
-/*==============================
-    terminate
-    Stops the program and prints "Press any key to continue..."
-    (if using curses)
-    @param A string to print
-    @param Variadic arguments to print as well
-==============================*/
+void terminate_with_code_impl(int exit_code, const char* reason, va_list args);
 
 void terminate(const char* reason, ...)
 {
     va_list args;
     va_start(args, reason);
 
+    terminate_with_code_impl(EXIT_FAILURE, reason, args);
+
+    va_end(args);
+}
+
+/*==============================
+    terminate_with_code
+    Stops the program and prints "Press any key to continue..."
+    (if using curses)
+    @param The exit code on exit
+    @param A string to print
+    @param Variadic arguments to print as well
+==============================*/
+
+void terminate_with_code(int exit_code, const char* reason, ...)
+{
+    va_list args;
+    va_start(args, reason);
+
+    terminate_with_code_impl(exit_code, reason, args);
+
+    va_end(args);
+}
+
+void terminate_with_code_impl(int exit_code, const char* reason, va_list args)
+{
     // Print why we're ending
     if (reason != NULL && strcmp(reason, ""))
     {
@@ -61,7 +81,6 @@ void terminate(const char* reason, ...)
         log_colored("Error: %s", CRDEF_ERROR, temp);
     }
     log_colored("\n", CRDEF_ERROR);
-    va_end(args);
 
     // Close output debug file if it exists
     if (debug_getdebugout() != NULL)
@@ -92,9 +111,9 @@ void terminate(const char* reason, ...)
     global_terminating = true;
     term_end();
     #ifndef LINUX
-        TerminateProcess(GetCurrentProcess(), 0);
+        TerminateProcess(GetCurrentProcess(), exit_code);
     #else
-        exit(0);
+        exit(exit_code);
     #endif
 }
 
@@ -112,14 +131,21 @@ void pauseprogram()
         system("pause > nul");
     #else
         struct termios info, orig;
-        tcgetattr(0, &info);
-        tcgetattr(0, &orig);
-        info.c_lflag &= ~(ICANON | ECHO);
-        info.c_cc[VMIN] = 1;
-        info.c_cc[VTIME] = 0;
-        tcsetattr(0, TCSANOW, &info);
+        tcgetattr(STDIN_FILENO, &info);
+        tcgetattr(STDIN_FILENO, &orig);
+
+        info.c_lflag &= ~ICANON; // Disable canonical mode (make input available immediately without waiting for a line delimiter)
+        info.c_lflag &= ~ECHO; // Disable echoing input characters
+
+        // Make read blocking until 1 byte is available
+        info.c_cc[VMIN] = 1; // Minimum number of characters for noncanonical read
+        info.c_cc[VTIME] = 0; // Timeout in deciseconds for noncanonical read
+
+        // Set the modified state and wait for a single byte input
+        tcsetattr(STDIN_FILENO, TCSANOW, &info);
         getchar();
-        tcsetattr(0, TCSANOW, &orig);
+        // Restore original terminal state
+        tcsetattr(STDIN_FILENO, TCSANOW, &orig);
     #endif
 
     // End

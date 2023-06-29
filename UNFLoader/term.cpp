@@ -686,8 +686,10 @@ static void termthread_simple()
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     while (!global_terminating)
     {
+        char* fgets_res;
+
         // Block until the user presses enter
-        if (local_allowinput && fgets(local_input, MAXINPUT-1, stdin) != NULL && !global_terminating)
+        if (local_allowinput && (fgets_res = fgets(local_input, MAXINPUT-1, stdin)) != NULL && !global_terminating)
         {
             // Remove trailing newline
             local_input[strcspn(local_input, "\r\n")] = 0;
@@ -705,6 +707,16 @@ static void termthread_simple()
 
             // Cleanup
             memset(local_input, 0, MAXINPUT);
+        }
+
+        if(feof(stdin)) {
+            while (get_escapelevel() > 0)
+                program_event(PEV_ESCAPE);
+            // Sleep to be kind to the CPU
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        } else if (fgets_res == NULL) {
+            // Sleep to be kind to the CPU
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
 }
